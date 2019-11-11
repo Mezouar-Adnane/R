@@ -1,0 +1,282 @@
+---
+title: "R / RStudio and the tidyverse"
+author: Guillaume Coqueret
+output: 
+    html_notebook
+---
+
+# Introduction
+
+## Course structure (1/2)
+
+1. In-class sessions: mix between slides & tutorials  
+2. Exercises: **practice** is the most important  
+3. Project, in two steps:  
+  - A short presentation of the project, due **31/10/2019**
+  - The full report & code, due **15/12/2019** 
+  - Please do not ask for adjournments
+
+Questions are crucial: don't be shy, there is no such thing as a bad question.   
+
+## Course structure (2/2)
+
+1. Introduction to R/RStudio & the tidyverse  
+2. Baseline R  
+3. Plots  
+4. Shiny 1 - User interface   
+5. Shiny 2 - Extensions  
+6. Shiny 3 - Deployment   
+7. Introduction to decision trees   
+8. Options!!!! => to be defined together
+
+## Install packages
+
+There are two steps: first you need to download the package (only once).
+The packages are downloaded from servers all around the world. So we start by choosing one.
+```{r CRAN_mirror}
+chooseCRANmirror(ind = 60)    # Set downloading location
+```
+
+```{r packages, message = FALSE, warning = FALSE, results = "hide"}
+install.packages("tidyverse") # Install (download) package: only once
+install.packages("gapminder") # Install (download) package: only once
+```
+
+**NOTE**: it's easy to install packages directly in RStudio ("Tools" tab).
+
+Then, if you want to work with it, you need to load/activate it. 
+```{r load, message = FALSE, warning = FALSE, results = "hide"}
+library(tidyverse)            # Activate: each time you launch RStudio
+library(gapminder)            # Activate: each time you launch RStudio
+```
+
+
+## Comments and output
+
+- One hashtag # precedes a comment in R.   
+- Two hashtags ## precede output from a code sequence in the slides.
+
+```{r comments}
+1+1 # Test!
+```
+
+In this notebook, code will appear in grey areas (rectangles).
+
+
+# Tidy data via *tidyr* 
+
+## Instances vs variables
+
+The **diamonds** database is included in the tidyverse. The **head**() function shows the first lines of a dataset.
+
+```{r diamonds}
+head(diamonds, 4) # The number gives the amount of rows shown
+head(gapminder,3)             # Have a look!
+```
+
+One **instance** = one observation = one **row**.  
+One **variable** = one **unique** characteristic = one **column**.
+
+
+## Variable types 
+
+- **number** (numerical): integer (int) or double (dbl)
+- **character**: text (chr)
+- **factor**: categorical, ordered (ord) or not (fct)
+- **boolean**: TRUE or FALSE / **T** or **F** (bool)
+- **date**: day precision (date) or second precision (time): usually starts 1970-01-01
+
+**NOTE**: we are only concerned with rectangular / structured datasets.
+
+
+## Tidy data: counter-example
+The table below shows the evolution of population of countries. 
+```{r rows.print = 4, cols.print = 4}
+spread(gapminder[c(1:4,13:16,25:28), c(1,3,5)], key = country, value = pop)
+```
+   
+Not tidy! The columns are not **VARIABLES**!  
+(This is typically the excel format.)
+
+
+## Tidy tools
+
+The tidyverse has two functions that switch from matrix/excel format to tidy data and back:
+
+- **gather**(): from matrix/excel to tidy data
+- **spread**(): from tidy data to matrix/excel
+
+Below, one example of data (called "not_tidy_pop"") in excel format.
+<div class="columns-2">
+```{r tidy_data, echo = FALSE, message = FALSE, warning = FALSE}
+Year <- c(1970, 1990, 2010)
+France <- c(52,59,65)
+Germany <- c(61,80,82)
+UK <- c(56,57,63)
+not_tidy_pop <- data_frame(Year, France, Germany, UK)
+not_tidy_pop
+```
+
+**BE VERY CAREFUL**: type case matters in R!     
+Continent ≠ continent.   
+When referring to a variable (column names), a mistake will lead to an error.
+
+
+## Tidy tool: gather! From wide to long
+
+Gather joins/concatenates columns which belong to the same variable.
+```{r tidy_gather, message = FALSE, warning = FALSE}
+tidy_pop <- gather(not_tidy_pop, key = Country, value = Population, -Year)
+```
+
+
+```{r}
+tidy_pop[1:7,]  # First 7 lines (only) shown
+```
+
+The syntax is the following:
+
+gather(**data**,    
+**key** = names_of_the_new_variable,     
+**value** = name_of_the_column_with_values,      
+-**variable_excluded_from_the_variable**    
+)
+
+**key** = Country because the columns are all countries.
+
+**value** = Population because the data pertains to population values.
+
+We use -**Year** because the Year variable is excluded from the gathering.
+
+
+## Tidy tools: spread! From long to wide.
+The reverse operation.
+```{r tidy_spread}
+spread(tidy_pop, key = Country, value = Population)
+```
+spread(**data**,   
+**key** = variable_to_be_put_in_columns,   
+**value** = which_column_to_split  
+)
+
+
+
+# Data manipulation via *dplyr*
+
+## Filter() rows - Part I
+Often, analyses are performed on subsets of data. 
+```{r filter()}
+filter(gapminder, lifeExp > 81.5) # Countries where people live long lives on average
+```
+
+
+## Filter() rows - Part II 
+Filters can be combined. 
+```{r filter_2}
+filter(gapminder, country == "Japan", year > 2000) 
+```
+
+
+Only two observations for Japan post-2000.  
+**NOTE**: as in **all** languages, there are **TWO EQUAL SIGNS** for the comparison.  
+One "=" is like the arrow (<-) and is used to **assign** values.
+
+## Select() columns 
+Sometimes, you might want to get rid of some variables to ease readability.
+```{r select(), table_red}
+select(gapminder[1:5,], country, year, pop)
+```
+
+## Sort via arrange() 
+This is when you want to order your data. Here, from smallest pop to largest.
+```{r arrange}
+head(arrange(gapminder, pop)) # Alternative: arrange(gapminder, desc(lifeExp)); desc() is for descending
+```
+
+## Create new columns via mutate() 
+With population and gdpPercap you can infer total GDP!
+```{r mutate}
+head(mutate(gapminder, gdp = pop * gdpPercap))
+```
+
+```{r}
+head(gapminder)
+```
+
+
+# Piping: %>%
+
+## Definition: sequences of operations 
+**Very often**, one simple analysis will require several steps. They can be combined via the **%>%** operator.
+```{r pipe1, results = FALSE}
+select(filter(diamonds, carat > 4), carat, price, clarity) # BEURK!
+```
+```{r pipe2}
+diamonds %>%
+  select(price, clarity, carat) %>%
+    filter(carat > 4) 
+     # So simple!
+```
+
+## Example
+```{r}
+diamonds %>% 
+    filter(carat > 2, cut == "Ideal") %>%      # First we filter
+    mutate(car_price_ratio = carat/price) %>%  # Then, we create a new column
+    arrange(desc(car_price_ratio)) %>%         # We order the data
+    select(-x, -y, -z) %>%                     # We take out some superfluous columns
+    head(4)                                    # Finally, we ask for the top 4 instances
+```
+
+
+
+# Pivot tables
+
+## Definition
+
+"*A pivot table is a table of statistics that summarizes the data of a more extensive table.*"
+
+--- Wikipedia
+
+There are two dimensions in a pivot table:  
+- which **variable**(s) we want to analyze;  
+- which **statistic** we want to compute.
+
+In R, these two steps are separated via two functions: **group_by**() and **summarise**()
+
+## Example I 
+
+```{r pt1}
+diamonds %>%
+    group_by(clarity, cut) %>%              # Define the variables
+    summarise(avg_price = mean(price),      # Define the statistics
+              avg_carat = mean(carat)) %>%  # Second stats
+    head()
+```
+
+## Example II
+
+```{r pt2}
+gapminder %>%
+    group_by(continent, year) %>%
+    summarise(avg_lifeExp = mean(lifeExp)) %>%
+    head()
+```
+
+
+## Resources / Links
+
+- an online series of exercises with solutions!:   
+https://gcoqueret.shinyapps.io/Exercises/
+- my course on statistics in R (and the many links therein!):  
+https://github.com/shokru/rstats    
+- Shiny use cases:   
+https://www.rstudio.com/products/shiny/shiny-user-showcase/
+- Other examples:   
+https://www.showmeshiny.com
+- My simple example of dynamic dashboard:    
+https://gcoqueret.shinyapps.io/olympics/
+- One other app (marketing):    
+https://mdancho84.shinyapps.io/shiny-app/
+
+
