@@ -1,0 +1,193 @@
+---
+title: "Women's Tennis Association analysi DMSMR: Mid-term progress report"
+author: "Mezouar Adnane"
+date: "October 31st, 2019"
+output:
+  html_notebook:
+    toc: true
+    number_section: true
+    toc_depth: 3
+---
+# Introduction {.tabset} 
+##Acknowledgements
+**from Kaggle**
+The WTA (Women's Tennis Association) is the principal organizing body of women's professional tennis, it governs its own tour worldwide. On its website, it provides a lot of data about the players as individuals as well the tour matches with results and the current rank during it.
+
+Luckily for us, Jeff Sackmann scraped the website and collected everything from there and put in a nice way into easily consumable datasets.
+
+On Jeff's GitHub account you can find a lot more data about tennis!
+
+SOME OF THE GRAPHS WERE ALREADY REPEATEDLY EXPLORED BY THE KAGGLE COMMUNITY. MY JOB WAS TO ALTER TO SUITE MY NEEDS, PERSONALIZE AND IMPROVE WHEN POSSIBLE. 
+
+## Motivation
+Tennis is among the most popular sports in the world with a fan base that transcends age, gender and geography. 
+
+Being a fan of the sport, it was inadmiscible for me to remain ignorant of what happens in the Women's division. Especially that there are amazing female athelets and super competetive tournaments organized by the WTA. 
+This project's primary objective is to educate my self about the Women's tennis divison and the best way to do so is by analyzing the WTA database. 
+
+## Necessary libraries
+```{r}
+library(readr)
+library(stringr)
+library(lubridate)
+library(dplyr)
+library(ggplot2)
+library(plotly)  
+library(treemapify)
+library(wordcloud)
+library(ggrepel)
+```
+
+## Loading Datasets
+First data set
+```{r}
+players <- read_csv("D:/MSc in DMDS/Semester I/DMSMR-Introduction to Data Science with R/Shiny app/Tennis/players.csv")
+head(players)
+```
+Second data set
+```{r}
+rankings <- read_csv("D:/MSc in DMDS/Semester I/DMSMR-Introduction to Data Science with R/Shiny app/Tennis/rankings.csv")
+head(rankings)
+```
+
+Joining the two data sets with the unique Key: player_id
+```{r}
+data <- inner_join(rankings, players) 
+head(data)
+```
+
+
+# Exploring and understanding the dataset {.tabset} 
+
+## The glimpse function
+```{r}
+glimpse(data)
+```
+
+
+##Summary
+```{r}
+summary(data)
+```
+
+
+#Visualizations{.tabset}
+## Who are they? 
+It is important to always keep in mind what our data is all about.  
+Most often than not, data points are actual human beings and it is definitely the case with this set.   
+So let's get to know the names of our tennis players !!
+```{r}
+names <- data %>% #Classic pivot table with group_by and summarize
+  group_by(first_name) %>%
+  summarise(name_freq = n()) %>% 
+  arrange(desc(name_freq)) %>%
+  top_n(50, wt = name_freq)
+names
+```
+_**Anna is the most common name with a frequency of 16494.**_
+
+```{r}
+wordcloud(words = names$first_name, freq = names$name_freq, #Wordcloud of firstnames
+          colors = brewer.pal(8, "Dark2"), #choosing the right color palette
+          random.order = FALSE,
+          rot.per = 0.3, #proportion words 90degree rotation
+          scale = c(4,0.5),
+          max.words = 50, #how many do I want to see?
+          font.main = 1) 
+```
+
+## WTA players per country
+```{r}
+data %>%
+  group_by(country_code) %>%
+  summarise(frequency = n()) %>%
+    ggplot(aes(area = frequency, fill = frequency, label = country_code)) +
+    geom_treemap() + #treemap visual
+    geom_treemap_text(colour = "white", # text parameters
+                      place = "centre",
+                      grow = TRUE) + # font follows area
+    ggtitle("Number of WTA players per country") # Visualization title
+
+```
+## WTA players per country per decade
+```{r}
+data %>%
+  mutate(year = substr(ranking_date, 1, 4)) %>% #isolating year from ranking_date and adding to new variable
+  mutate(decade = round((as.numeric(year)-5)/10,0)*10 ) %>% # year is a character 
+  group_by(decade, country_code) %>%
+  summarise(frequency = n()) %>%#pivot table
+  top_n(n = 20, wt = frequency) %>% #maybe just use head?
+  ggplot(aes(area = frequency, fill = country_code, label = country_code, subgroup = decade)) +
+  geom_treemap() + #another tree map
+  geom_treemap_text(colour = "white", #text parameters
+                    place = "centre",
+                    grow = TRUE) +
+  facet_wrap( ~ decade) + #see change per decade variable
+  theme(legend.position = "none") + #excluding the country_code legend
+  ggtitle("Top 20 Countries by number of players for each decade")
+```
+
+We can see that the sport is getting more crowded and more competitive as younger players from foreign nations join the game.
+ 
+## All time best
+```{r}
+data %>%
+  filter(ranking == 1) %>% #only keep first ranks
+  mutate(full_name = paste(first_name, last_name)) %>% #glue the name to avoid confusion 
+  group_by(full_name) %>% #pivot table
+  summarise(
+      freq_num_1 = n(), #repetitions in name
+      country = min(country_code), #keep one country code
+      latest_ranking = max(ranking_date)) %>% #Most recent date rank was achieved
+  mutate(latest_ranking_year = substr(latest_ranking, 1, 4)) %>% #only keep year 
+  ggplot(aes(x = freq_num_1, y = latest_ranking_year, label = full_name)) + #plot
+    geom_point(position = "jitter") + #Randomly moving data points to  create space
+    geom_text_repel(aes(color = latest_ranking_year)) + #Avoiding overlap in data point labels
+  ggtitle("WTA's all time best players") + labs(x = "times ranked #1", y = "last time ranking #1")
+
+```
+
+
+This graph shows how long each athlete stayed at the top to gauge competitiveness and overall domination of the game. 
+* Movement along the X axis depicts game domination.
+* Movement along the Y axis depicts the achievement's recency
+Our two outliers are Steffi Graf and Serena Williams who are both way ahead of the third position Martina Hingis. 
+These are super athletes with legendary careers in the sport but have they ever known a period of weakness?? 
+
+
+# Rank analysis{.tabset}
+
+##Serena Williams
+```{r}
+Serena_trend <- data %>%
+  mutate(date = ymd(ranking_date)) %>% #new column with ymd format
+  filter(first_name == "Serena", last_name == "Williams") %>% #selecting our athelte
+  ggplot(aes(x = date, y = ranking)) + geom_point() +#classic scatterplot
+  scale_y_reverse() #the closer to 0 the better it's a rank!
+ggplotly(Serena_trend)#interactive plotly!
+```
+The graph above shows us that even the best of the best do start from 0 anc climb their way up. As Serena started her career with a rank of 453. She even had two major setbacks in 2006 and 2011. I wonder what happend in her life back then? An injury? a major life event?
+
+##Steffi Graf
+```{r}
+Steffi_trend <- data %>%
+  mutate(date = ymd(ranking_date)) %>%
+  filter(first_name == "Steffi", last_name == "Graf") %>%
+  ggplot(aes(x = date, y = ranking)) + geom_point() +
+  scale_y_reverse()
+ggplotly(Steffi_trend)
+```
+Steffi Graph tells us a wohle different story. She starts her career at a much higher rank than Serena at 101. Maybe the sport was much less competitive back in the early 80s?(We know that's a fact from the graphs in the previous sections).She's also more consistent in her career as she only knew one setback which was in her late career close to retirement. In 1998 Steffi falls to a rank of 91 which close to where she started 15 years earlier.
+Was she aiming to preserve her legacy before retirement? Was that the most beautiful comeback in tennis history?
+
+##Martina Hingis
+```{r}
+Simona_trend <- data %>%
+  mutate(date = ymd(ranking_date)) %>%
+  filter(first_name == "Martina", last_name == "Hingis") %>%
+  ggplot(aes(x = date, y = ranking)) + geom_point() +
+  scale_y_reverse()
+ggplotly(Simona_trend)
+```
+Martina's career is more of a roller-coaster with a big gap between 2003 and 2006. Makes me wonder how she climbed up the ranks so fast after not competing for so long! 
+
