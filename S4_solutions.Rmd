@@ -1,0 +1,366 @@
+---
+title: "Shiny exercises: beginner level"
+output: html_notebook
+---
+
+First things first: package installation...
+
+```{r}
+install.packages("shiny")             # Shiny
+install.packages("shinydashboard")    # Shiny dashboards
+install.packages("DT")                # Package for datatables (just in case)
+```
+
+... and activation + load the data.
+
+```{r}
+library(tidyverse)        # Just to be sure it's the first thing that is done...
+library(shiny)
+library(shinydashboard)
+library(DT)
+
+load("songs.RData")
+load("movies.RData")
+```
+
+
+# Songs dataset: exercises
+
+The empty dashboard is given below:
+
+```{r}
+ui <- dashboardPage(           # FULL PAGE
+    dashboardHeader(),         # Header zone
+    dashboardSidebar(),        # Sidebar zone
+    dashboardBody()            # Body zone
+)  
+
+server <- function(input, output){  # Server: computations!
+    
+}
+
+# Run the app ----
+shinyApp(ui = ui, server = server)  # Aggregates the app.
+```
+
+**0**. Give a title to the dashboard. Something like "Songs Dashboard".
+
+```{r}
+ui <- dashboardPage(                                    # FULL PAGE: don't touch!
+    dashboardHeader(title = "Songs Dashboard"),         # Header zone
+    dashboardSidebar(),                                 # Sidebar zone
+    dashboardBody()                                     # Body zone
+)  
+
+server <- function(input, output){                      # Server: computations!
+    
+}
+
+# Run the app ----
+shinyApp(ui = ui, server = server)                      # Aggregates the app.
+```
+
+**1**. **GOAL**: Create a widget to perform a filter on popularity and display the filtered data
+a) in the sidebar, create a slider that goes from 0 to 100. Call the input **pop** for simplicity. Execute to check! For documentation on slider, type "sliders shiny" in Google and/or have a look at https://shiny.rstudio.com/articles/sliders.html
+
+```{r}
+ui <- dashboardPage(                                                   # FULL PAGE: don't touch!
+    dashboardHeader(title = "Songs Dashboard"),                        # Header zone
+    dashboardSidebar(sliderInput("pop", h4("Popularity"),              # a) Popularity widget (UI)
+                                 min = 0, max = 100,                      
+                                 value = c(0, 100), step = 1, sep = "")),        
+    dashboardBody()                                                    # Body zone
+)  
+
+server <- function(input, output){                                     # Server: computations!
+    
+}
+
+# Run the app ----
+shinyApp(ui = ui, server = server)                                     # Aggregates the app.
+```
+
+
+b) render the **songs** dataset as a DataTable in the server and load it in the body of the UI. **Hint** use a variable name like output$table in the server and use DataTable formats!
+
+```{r}
+ui <- dashboardPage(                                                   # FULL PAGE: don't touch!
+    dashboardHeader(title = "Songs Dashboard"),                        # Header zone
+    dashboardSidebar(sliderInput("pop", h4("Popularity"),              # a) Popularity widget
+                                 min = 0, max = 100,                      
+                                 value = c(0, 100), step = 1, sep = "")),        
+    dashboardBody(dataTableOutput("table"))                            # b) load the table
+)  
+
+server <- function(input, output){                                     # Server: computations!
+    output$table <- renderDataTable(songs)                             # Not reactive.
+}
+
+# Run the app ----
+shinyApp(ui = ui, server = server)  # Aggregates the app.
+```
+
+c) This table is not linked with the slider in the sidebar! Next step: inside the server, create a **reactive** dataset in which a filter updates the range of the popularity of the songs displayed in the UI (**Hint**: use input$pop in the filter). Then render this dataset instead of the old one.
+
+
+```{r}
+ui <- dashboardPage(                                                   # FULL PAGE: don't touch!
+    dashboardHeader(title = "Songs Dashboard"),                        # Header zone
+    dashboardSidebar(sliderInput("pop", h4("Popularity"),              # a) Popularity widget
+                                 min = 0, max = 100,                      
+                                 value = c(0, 100), step = 1, sep = "")
+    ),        
+    dashboardBody(dataTableOutput("table"))                            # b) load the table
+)  
+
+server <- function(input, output){                                     # Server: computations!
+    data <- reactive(
+        songs %>% filter(popularity >= input$pop[1],                   # c) filter
+                         popularity <= input$pop[2])
+    )
+    output$table <- renderDataTable(data())                            # c) reactive!
+}
+
+# Run the app ----
+shinyApp(ui = ui, server = server)  # Aggregates the app.
+```
+
+**2**. **GOAL**: add another widget and include a plot (on top of the current app).
+a) Create another widget on the **energy** variable that spans the unit interval [0,1].   
+
+```{r}
+ui <- dashboardPage(                                                   # FULL PAGE: don't touch!
+    dashboardHeader(title = "Songs Dashboard"),                        # Header zone
+    dashboardSidebar(sliderInput("pop", h4("Popularity"),              
+                                 min = 0, max = 100,                      
+                                 value = c(0, 100), step = 1, sep = ""),
+                     sliderInput("energy", h4("Energy"),                # a) Energy widget
+                                 min = 0, max = 1,
+                                 value = c(0,1), step = 0.1, sep = "")
+    ),        
+    dashboardBody(dataTableOutput("table"))                            
+)  
+
+server <- function(input, output){             # Server: computations!
+    data <- reactive(
+        songs %>% filter(popularity >= input$pop[1],
+                         popularity <= input$pop[2])
+    )
+    output$table <- renderDataTable(data())    # Not reactive.
+}
+
+# Run the app ----
+shinyApp(ui = ui, server = server)  # Aggregates the app.
+```
+
+b) render a plot based on the reactive data with geom_point() with x = **energy** and y = **popularity** and color = **speechiness**
+
+```{r}
+ui <- dashboardPage(                                                   # FULL PAGE: don't touch!
+    dashboardHeader(title = "Songs Dashboard"),                        # Header zone
+    dashboardSidebar(sliderInput("pop", h4("Popularity"),              
+                                 min = 0, max = 100,                      
+                                 value = c(0, 100), step = 1, sep = ""),
+                     sliderInput("energy", h4("Energy"),                # a) Energy widget
+                                 min = 0, max = 1,
+                                 value = c(0,1), step = 0.1, sep = "")
+    ),        
+    dashboardBody(plotOutput("plot"),
+                  dataTableOutput("table")
+    )                            
+)  
+
+server <- function(input, output){  # Server: computations!
+    data <- reactive(
+        songs %>% filter(popularity >= input$pop[1],
+                         popularity <= input$pop[2])
+    )
+    output$table <- renderDataTable(data())   # Not reactive.
+    
+    output$plot <- renderPlot({
+        data() %>% ggplot(aes(x = energy, y = popularity, color = speechiness)) + geom_point()
+    })
+}
+
+# Run the app ----
+shinyApp(ui = ui, server = server)  # Aggregates the app.
+```
+
+c) add the filter on energy in the server! To see the effect, add a xlim(0,1) in the plot specs.
+```{r}
+ui <- dashboardPage(                                                   # FULL PAGE: don't touch!
+    dashboardHeader(title = "Songs Dashboard"),                        # Header zone
+    dashboardSidebar(sliderInput("pop", h4("Popularity"),              
+                                 min = 0, max = 100,                      
+                                 value = c(0, 100), step = 1, sep = ""),
+                     sliderInput("energy", h4("Energy"),                # a) Energy widget
+                                 min = 0, max = 1,
+                                 value = c(0,1), step = 0.1, sep = "")
+    ),        
+    dashboardBody(plotOutput("plot"),
+                  dataTableOutput("table")
+    )                            
+)  
+
+server <- function(input, output){                  # Server: computations!
+    data <- reactive(
+        songs %>% filter(popularity >= input$pop[1],
+                         popularity <= input$pop[2],
+                         energy >= input$energy[1],
+                         energy <= input$energy[2])
+    )
+    output$table <- renderDataTable(data())         # Not reactive.
+    
+    output$plot <- renderPlot({
+        data() %>% ggplot(aes(x = energy, y = popularity, color = speechiness)) + geom_point() + xlim(0,1)
+    })
+}
+
+# Run the app ----
+shinyApp(ui = ui, server = server)  # Aggregates the app.
+```
+
+# Movies dataset: exercises
+
+Don't forget to have loaded the movies dataset!
+
+**0**. Give a title to the dashboard. Something like "Movies Dashboard".
+
+```{r}
+ui <- dashboardPage(                                     # FULL PAGE: don't touch!
+    dashboardHeader(title = "Movies Dashboard"),         # Header zone
+    dashboardSidebar(),                                  # Sidebar zone
+    dashboardBody()                                      # Body zone
+)  
+
+server <- function(input, output){  # Server: computations!
+    
+}
+
+# Run the app ----
+shinyApp(ui = ui, server = server)  # Aggregates the app.
+```
+
+**1**. **GOAL**: Create a widget to perform a filter on duration and display the filtered data
+a) in the sidebar, create a slider that goes from 37 to 330. Call the input **duration** for simplicity.
+
+```{r}
+ui <- dashboardPage(                                                   # FULL PAGE: don't touch!
+    dashboardHeader(title = "Movies Dashboard"),                       # Header zone
+    dashboardSidebar(sliderInput("duration", h4("Duration (min)"),     # a) Duration widget (UI)
+                                 min = 37, max = 330,                      
+                                 value = c(37, 330), step = 1, sep = "")),        
+    dashboardBody()                                                    # Body zone
+)  
+
+server <- function(input, output){  # Server: computations!
+    
+}
+
+# Run the app ----
+shinyApp(ui = ui, server = server)  # Aggregates the app.
+```
+
+b) render the **movies** dataset as a DataTable in the server and load it in the body of the UI. **Hint** use a variable name like output$table in the server and use DataTable formats!
+
+```{r}
+ui <- dashboardPage(                                                   # FULL PAGE: don't touch!
+    dashboardHeader(title = "Movies Dashboard"),                       # Header zone
+    dashboardSidebar(sliderInput("duration", h4("Duration (min)"),     # a) Duration widget (UI)
+                                 min = 37, max = 330,                      
+                                 value = c(37, 330), step = 1, sep = "")),         
+    dashboardBody(dataTableOutput("table"))                            # b) load the table
+)  
+
+server <- function(input, output){                                     # Server: computations!
+    output$table <- renderDataTable(movies)                            # Not reactive.
+}
+
+# Run the app ----
+shinyApp(ui = ui, server = server)  # Aggregates the app.
+```
+
+c) Link the two sides with a reactive filter.
+
+```{r}
+ui <- dashboardPage(                                                    # FULL PAGE: don't touch!
+    dashboardHeader(title = "Movies Dashboard"),                        # Header zone
+    dashboardSidebar(sliderInput("duration", h4("Duration (min)"),      # 2a) Duration widget (UI)
+                                 min = 37, max = 330,                      
+                                 value = c(37, 330), step = 1, sep = "")),         
+    dashboardBody(dataTableOutput("table"))                             # 2b) load the table
+)  
+
+server <- function(input, output){                                      # Server: computations!
+    data <- reactive(                                                   # Reactive!
+        movies %>% filter(duration >= input$duration[1],                # 2c) filter on duration
+                          duration <= input$duration[2])                # 2c) filter on duration
+    )
+    output$table <- renderDataTable(data())                             # Reactive!
+}
+
+# Run the app ----
+shinyApp(ui = ui, server = server)  # Aggregates the app.
+```
+
+**3**. Create a **checkboxGroupInput** widget for the color of the movie ("Color" versus "Black and White") and apply the corresponding filter in the server. If need be, see https://shiny.rstudio.com/reference/shiny/1.0.4/checkboxGroupInput.html
+
+```{r}
+ui <- dashboardPage(                                                   # FULL PAGE: don't touch!
+    dashboardHeader(title = "Movies Dashboard"),                       # Header zone
+    dashboardSidebar(sliderInput("duration", h4("Duration (min)"),     # 2a) Duration widget (UI)
+                                 min = 37, max = 330,                      
+                                 value = c(37, 330), step = 1, sep = ""),
+                     checkboxGroupInput("color", h4("Color"),                                  # 3)
+                                        choices = list("Color" = "Color", 
+                                                       "Black and White" = "Black and White"), # 3) Exact terms!
+                                        selected = c("Color", "BW"))),         
+    dashboardBody(dataTableOutput("table"))                            # 2b) load the table
+)  
+
+server <- function(input, output){                                     # Server: computations!
+    data <- reactive(                                                  # Reactive data!
+        movies %>% filter(duration >= input$duration[1],               # 2c) filter (duration)
+                          duration <= input$duration[2],               # 2c) filter (duration)
+                          color %in% input$color)                      # 3) color filter
+    )
+    output$table <- renderDataTable(data())                            # Reactive!
+}
+
+# Run the app ----
+shinyApp(ui = ui, server = server)  # Aggregates the app.
+```
+
+**4**. Add a plot which shows the average **imdb_score** (y-axis) of the films for each year (x-axis). Perform the analysis on the dynamic data (not on the original movies dataset).
+
+```{r}
+ui <- dashboardPage(                                                   # FULL PAGE: don't touch!
+    dashboardHeader(title = "Movies Dashboard"),                       # Header zone
+    dashboardSidebar(sliderInput("duration", h4("Duration (min)"),     # 2a) Duration widget (UI)
+                                 min = 37, max = 330,                      
+                                 value = c(37, 330), step = 1, sep = ""),
+                     checkboxGroupInput("color", h4("Color"),                                  # 3)
+                                        choices = list("Color" = "Color", 
+                                                       "Black and White" = "Black and White"), # 3) Exact terms!
+                                        selected = c("Color", "BW"))),         
+    dashboardBody(plotOutput("plot"),                                   # 4)
+                  dataTableOutput("table"))                            # 2b) load the table
+)  
+
+server <- function(input, output){                                     # Server: computations!
+    data <- reactive(                                                  # Reactive data!
+        movies %>% filter(duration >= input$duration[1],               # 2c) filter (duration)
+                          duration <= input$duration[2],               # 2c) filter (duration)
+                          color %in% input$color)                      # 3) color filter
+    )
+    output$table <- renderDataTable(data())                            # Reactive!
+    output$plot <- renderPlot(                                         # 4) Plot (on reactive data)
+        data() %>% group_by(year) %>% 
+            summarise(avg_score = mean(imdb_score)) %>%
+            ggplot(aes(x = year, y = avg_score)) + geom_line() + geom_point()
+    )
+}
+
+# Run the app ----
+shinyApp(ui = ui, server = server)  # Aggregates the app.
+```
